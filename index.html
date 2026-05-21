@@ -207,7 +207,7 @@
             animation: fadeUp 0.3s ease-out forwards;
         }
 
-        /* [추가] 햄버거 회피 성공 시 체력 회복 텍스트 스타일 */
+        /* 햄버거 회피 성공 시 체력 회복 텍스트 스타일 */
         .heal-text {
             position: absolute;
             top: -30px;
@@ -218,7 +218,7 @@
             animation: fadeUp 0.5s ease-out forwards;
         }
 
-        /* 무작위 생성된 가상 햄버거집(Burger Pin) 마커 스타일 */
+        /* 가상 햄버거집 마커 스타일 */
         .burger-marker-pin {
             background: #ff9800;
             color: white;
@@ -317,8 +317,6 @@
     ];
 
     let schoolOverlays = [];
-    
-    // [변경] 기존 cafe 변수들을 burger 변수로 대체하여 관리
     let burgerShops = [];     
     let burgerOverlays = [];  
 
@@ -450,11 +448,9 @@
         schools.forEach(s => bounds.extend(new kakao.maps.LatLng(s.lat, s.lng)));
         map.setBounds(bounds);
 
-        // [변경] 카카오 API 대신 현재 화면 바운드 내부에 6개의 가상 햄버거집을 자체 난수 생성
         generateRandomBurgerShops(bounds);
     }
 
-    // [신규 함수] 지도 경계면 내부에 랜덤 햄버거 매장을 강제 소환하는 시스템
     function generateRandomBurgerShops(bounds) {
         burgerShops = [];
         burgerOverlays.forEach(o => o.setMap(null));
@@ -466,7 +462,6 @@
         const names = ["맥도날드", "버거킹", "롯데리아", "맘스터치", "프랭크버거", "셰이크쉑"];
 
         for (let i = 0; i < names.length; i++) {
-            // 위도와 경도를 현재 학교들이 배치된 사각형 영역 안쪽으로 무작위 매칭
             const randomLat = sw.getLat() + Math.random() * (ne.getLat() - sw.getLat());
             const randomLng = sw.getLng() + Math.random() * (ne.getLng() - sw.getLng());
 
@@ -477,7 +472,6 @@
             };
             burgerShops.push(shop);
 
-            // 맵에 오렌지색 핀 마커로 랜더링
             const el = document.createElement('div');
             el.className = 'burger-marker-pin';
             el.innerHTML = `🍔 ${shop.name}`;
@@ -556,10 +550,11 @@
 
     function beginBattle() {
         warInterval = setInterval(() => {
-            // 1. 레이저 사격 연산
+            // 1. 레이저 사격 연산 및 적 학교 자동 점프 AI 제어
             schools.forEach(source => {
                 if (source.hp <= 0) return;
 
+                // 일반 상황 회피 기동 레이저 점프 (20% 확률)
                 if (!source.isPlayer && !source.isJumping && !source.onCooldown) {
                     if (Math.random() < 0.20) triggerJump(source.id);
                 }
@@ -585,12 +580,21 @@
                 if (target) animateProjectile(source, target, 'laser');
             });
 
-            // 2. 가상 생성된 햄버거집 폭격 연산 (40% 확률로 포격 수행)
+            // 2. 가상 생성된 햄버거집 폭격 연산 (40% 확률)
             if (burgerShops.length > 0 && Math.random() < 0.40) {
                 const randomShop = burgerShops[Math.floor(Math.random() * burgerShops.length)];
                 const livingSchools = schools.filter(s => s.hp > 0);
                 if (livingSchools.length > 0) {
                     const targetSchool = livingSchools[Math.floor(Math.random() * livingSchools.length)];
+                    
+                    // [AI 보완] 적 학교가 타겟이 되었을 때, 40% 확률로 🍔 폭격을 예상하고 날아오기 전에 선제 점프를 시도하도록 설계
+                    if (!targetSchool.isPlayer && !targetSchool.isJumping && !targetSchool.onCooldown) {
+                        if (Math.random() < 0.40) {
+                            // 투사체가 날아가는 도중에 공중에 떠 있도록 약간의 시차 텀을 부여하여 점프 트리거
+                            setTimeout(() => triggerJump(targetSchool.id), 100);
+                        }
+                    }
+
                     animateProjectile(randomShop, targetSchool, 'hamburger');
                 }
             }
@@ -647,7 +651,6 @@
                 if (laserLine) laserLine.setMap(null);
                 if (burgerOverlay) burgerOverlay.setMap(null);
 
-                // [변경] 투사체 분기에 맞춰 데미지 혹은 피격 우회 판정 핸들링
                 if (type === 'laser') {
                     applyDamageHit(target);
                 } else {
@@ -657,7 +660,6 @@
         }, 20); 
     }
 
-    // 1. 일반 레이저 피격 로직
     function applyDamageHit(target) {
         if (target.hp <= 0) return;
 
@@ -670,26 +672,25 @@
         updateHpBar(target);
     }
 
-    // 2. [신규 추가] 햄버거 전용 피격/회피 로직
+    // 햄버거 피격/회피 판정 (이제 모든 적 AI 학교에도 일괄 동등 적용!)
     function applyBurgerHit(target) {
         if (target.hp <= 0) return;
 
-        // 점프로 피했을 경우 -> 보상으로 HP(XP 개념) +2 회복!
+        // 플레이어든 적 컴퓨터든 점프 상태에서 🍔를 맞이하면 똑같이 HP +2 회복!
         if (target.isJumping) {
             target.hp += 2;
-            if (target.hp > target.maxHp) target.hp = target.maxHp; // 최대치(30) 초과 방지 보정
+            if (target.hp > target.maxHp) target.hp = target.maxHp; 
             
             showEffectText(target.id, 'HP +2!', 'heal-text');
             updateHpBar(target);
             return;
         }
 
-        // 피하지 못하고 맞았을 경우 -> 데미지 1 차감
+        // 공중 회피 실패 시 대미지 1 처리
         target.hp -= 1;
         updateHpBar(target);
     }
 
-    // HP 바 그래픽 갱신 공통 함수
     function updateHpBar(target) {
         const hpFill = document.getElementById(`hp-fill-${target.id}`);
         if (hpFill) {
@@ -704,7 +705,6 @@
         }
     }
 
-    // 플로팅 텍스트 이펙트 통합 출력 함수
     function showEffectText(schoolId, text, className) {
         const node = document.getElementById(`school-node-${schoolId}`);
         if (node) {
