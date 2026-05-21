@@ -25,7 +25,7 @@
             height: 100%;
         }
 
-        /* 왼쪽 사이드바 (검색 및 리스트) */
+        /* 왼쪽 사이드바 */
         #sidebar {
             width: 350px;
             height: 100%;
@@ -108,19 +108,19 @@
             transform: scale(1.1);
         }
 
-        /* 전쟁 모드 UI 요소들 */
+        /* 학교 커스텀 오버레이 */
         .school-overlay-box {
             display: flex;
             flex-direction: column;
             align-items: center;
             cursor: pointer;
             position: relative;
-            transition: transform 0.1s ease-out; /* 점프 애니메이션 부드럽게 */
+            transition: transform 0.05s ease-out; /* 점프가 빠르게 일어나도록 반응속도 상향 */
         }
 
-        /* 점프 상태 클래스 */
+        /* 번쩍 튀어오르는 고속 점프 CSS */
         .school-overlay-box.jumping {
-            transform: translateY(-50px) scale(1.1);
+            transform: translateY(-60px) scale(1.15);
         }
 
         .hp-bar-container {
@@ -157,40 +157,54 @@
             border: 2px solid #fff;
         }
 
-        /* 쿨타임 표시 레이블 */
         .cooldown-indicator {
-            font-size: 10px;
-            color: #555;
-            background: rgba(255, 255, 255, 0.8);
+            font-size: 9px;
+            color: #d32f2f;
+            background: rgba(255, 255, 255, 0.9);
             padding: 1px 3px;
             border-radius: 3px;
             margin-top: 2px;
+            font-weight: bold;
             display: none;
         }
 
-        /* 회피 문구 스타일 */
         .dodge-text {
             position: absolute;
-            top: -25px;
+            top: -30px;
             color: #00ff2b;
             font-weight: bold;
-            font-size: 16px;
-            text-shadow: 1px 1px 2px #000;
-            animation: fadeUp 0.4s ease-out forwards;
+            font-size: 18px;
+            text-shadow: 2px 2px 2px #000;
+            animation: fadeUp 0.3s ease-out forwards;
         }
 
-        /* 카페 마커 커스텀 스타일 */
-        .cafe-marker {
-            font-size: 20px;
-            background: white;
-            border: 1px solid #9c27b0;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
+        /* 명확하게 개편된 카페 핀(Pin) 마커 스타일 */
+        .cafe-marker-pin {
+            background: #9c27b0;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 20px;
+            border: 2px solid white;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+            white-space: nowrap;
             display: flex;
-            justify-content: center;
             align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            gap: 2px;
+        }
+        /* 핀 아래 꼬리 모양 표식 */
+        .cafe-marker-pin::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0;
+            border-style: solid;
+            border-color: #9c27b0 transparent;
+            display: block;
+            width: 0;
         }
 
         #countdown-overlay {
@@ -220,7 +234,7 @@
 
         @keyframes fadeUp {
             0% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(-15px); }
+            100% { opacity: 0; transform: translateY(-20px); }
         }
     </style>
 </head>
@@ -249,7 +263,6 @@
     let warInterval = null;
     let userTargetId = null;
 
-    // 학교 상태 데이터 (점프 속성 추가)
     const schools = [
         { id: 0, name: "고양국제고", lat: 37.671912, lng: 126.812324, hp: 30, isPlayer: true, isJumping: false, onCooldown: false },
         { id: 1, name: "양일초", lat: 37.671040, lng: 126.815520, hp: 30, isPlayer: false, isJumping: false, onCooldown: false },
@@ -259,12 +272,12 @@
     ];
 
     let schoolOverlays = [];
-    let cafeList = []; // 지도 내 카페 데이터 저장 배열
-    let cafeOverlays = []; // 생성된 카페 오버레이 배열
+    let cafeList = []; 
+    let cafeOverlays = []; 
 
-    // 점프 시간 매개변수 설정
-    const jumpDuration = 600; // 체공 시간 0.6초
-    const cooldownDuration = 900; // 쿨타임 0.9초 (0.6 * 1.5)
+    // 점프 속도 매개변수 고속 상향 조정 (체공 0.25초, 쿨타임 0.375초)
+    const jumpDuration = 250; 
+    const cooldownDuration = 375; 
 
     kakao.maps.load(() => {
         const container = document.getElementById('map');
@@ -287,11 +300,10 @@
             if (e.key === 'Enter') searchPlaces();
         });
 
-        // 사용자의 스페이스바 입력 감지 이벤트 리스너 등록
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && isWarMode) {
-                e.preventDefault(); // 스페이스바의 브라우저 기본 스크롤 현상 차단
-                triggerJump(0); // 고양국제고(id: 0) 점프 기동
+                e.preventDefault(); 
+                triggerJump(0); 
             }
         });
     });
@@ -319,40 +331,36 @@
         });
     }
 
-    // 점프 메커니즘 함수
+    // 고속 점프 함수
     function triggerJump(schoolId) {
         const school = schools[schoolId];
         if (!school || school.hp <= 0 || school.isJumping || school.onCooldown) return;
 
-        // 1. 점프 시작과 동시에 쿨타임 트리거 (요구사항 반영)
         school.isJumping = true;
         school.onCooldown = true;
 
         const overlayDom = document.getElementById(`school-node-${schoolId}`);
         if (overlayDom) {
-            overlayDom.classList.add('jumping'); // 위로 튀어오르는 CSS 부여
+            overlayDom.classList.add('jumping'); 
         }
 
         const cdLabel = document.getElementById(`cooldown-${schoolId}`);
         if (cdLabel) {
             cdLabel.style.display = "block";
-            cdLabel.innerText = "쿨타임..";
+            cdLabel.innerText = "COOL";
         }
 
-        // 2. 체공 시간 종료 후 하강 처리
         setTimeout(() => {
             school.isJumping = false;
             if (overlayDom) overlayDom.classList.remove('jumping');
         }, jumpDuration);
 
-        // 3. 점프 시작점 기준 쿨타임 시간 완료 후 다시 점프 가능하도록 원복
         setTimeout(() => {
             school.onCooldown = false;
             if (cdLabel) cdLabel.style.display = "none";
         }, cooldownDuration);
     }
 
-    // 전쟁 모드 시작 진입점
     document.getElementById('tank-btn').onclick = function() {
         if (isWarMode) return;
         startWarMode();
@@ -365,32 +373,28 @@
         schools.forEach(s => bounds.extend(new kakao.maps.LatLng(s.lat, s.lng)));
         map.setBounds(bounds);
 
-        // 맵에 존재하는 근처 카페들 수집 개시
         fetchNearbyCafes(bounds);
     }
 
-    // 카카오맵 카테고리 서비스를 통해 영역 내 카페('CE7') 검색 및 표시
     function fetchNearbyCafes(bounds) {
         cafeList = [];
         ps.categorySearch('CE7', (data, status) => {
             if (status === kakao.maps.services.Status.OK) {
-                // 상위 최대 10개 카페만 수집하여 배치
-                cafeList = data.slice(0, 10);
+                cafeList = data.slice(0, 8); // 정예 카페 8곳 지정
                 cafeList.forEach(cafe => {
                     const el = document.createElement('div');
-                    el.className = 'cafe-marker';
-                    el.innerHTML = '☕';
-                    el.title = cafe.place_name;
+                    el.className = 'cafe-marker-pin'; // 핀 형태로 디자인 교체
+                    el.innerHTML = `☕ ${cafe.place_name.substring(0,5)}..`;
 
                     const overlay = new kakao.maps.CustomOverlay({
                         position: new kakao.maps.LatLng(cafe.y, cafe.x),
-                        content: el
+                        content: el,
+                        yAnchor: 1.2
                     });
                     overlay.setMap(map);
                     cafeOverlays.push(overlay);
                 });
             }
-            // 카페 연동이 끝났든 에러가 났든 카운트다운 후 매치 실행
             runCountdown();
         }, { bounds: bounds });
     }
@@ -452,13 +456,13 @@
 
     function beginBattle() {
         warInterval = setInterval(() => {
-            // 1. 레이저 자동 발사 페이즈 (1초 주기)
+            // 1. 레이저 자동 발사 시스템
             schools.forEach(source => {
                 if (source.hp <= 0) return;
 
-                // 적군(나머지 학교)의 인공지능 랜덤 회피 점프 시도 (15% 확률)
+                // 적들의 변칙 회피 점프 (20% 확률로 기동)
                 if (!source.isPlayer && !source.isJumping && !source.onCooldown) {
-                    if (Math.random() < 0.15) triggerJump(source.id);
+                    if (Math.random() < 0.20) triggerJump(source.id);
                 }
 
                 let target = null;
@@ -479,13 +483,18 @@
                 }
             });
 
-            // 2. 카페 햄버거 테러 페이즈 (35% 확률로 발생)
-            if (cafeList.length > 0 && Math.random() < 0.35) {
+            // 2. 카페 햄버거 폭격 시스템 (40% 확률로 무작위 투척)
+            if (cafeList.length > 0 && Math.random() < 0.40) {
                 const randomCafe = cafeList[Math.floor(Math.random() * cafeList.length)];
                 const livingSchools = schools.filter(s => s.hp > 0);
                 if (livingSchools.length > 0) {
                     const targetSchool = livingSchools[Math.floor(Math.random() * livingSchools.length)];
-                    const cafeSource = { lat: parseFloat(randomCafe.y), lng: parseFloat(randomCafe.x), isCafe: true };
+                    
+                    // 버그 수정 핵심 부위: 카카오맵 좌표 문자열 데이터를 Number타입 숫자로 확실하게 변환
+                    const cafeSource = { 
+                        lat: Number(randomCafe.y), 
+                        lng: Number(randomCafe.x) 
+                    };
                     animateProjectile(cafeSource, targetSchool, 'hamburger');
                 }
             }
@@ -494,16 +503,15 @@
         }, 1000);
     }
 
-    // 날아가는 연출을 구현한 통합 투사체 시스템 (프레임 기반 애니메이션 기법)
+    // 투사체 정밀 비행 제어 애니메이션
     function animateProjectile(source, target, type) {
         let currentProgress = 0;
-        const totalFrames = 15; // 투사체가 날아가는 세부 단계 스텝 수
+        const totalFrames = 12; // 비행 속도감을 위해 프레임 수 축소 조정
         
         let laserLine = null;
         let burgerOverlay = null;
 
         if (type === 'laser') {
-            // 레이저는 늘어나는 선으로 연출
             laserLine = new kakao.maps.Polyline({
                 path: [new kakao.maps.LatLng(source.lat, source.lng), new kakao.maps.LatLng(source.lat, source.lng)],
                 strokeWeight: 4,
@@ -513,22 +521,22 @@
             });
             laserLine.setMap(map);
         } else if (type === 'hamburger') {
-            // 햄버거는 이모지 커스텀 오버레이가 수우욱 날아가는 연출
             const burgerEl = document.createElement('div');
-            burgerEl.style.fontSize = "22px";
+            burgerEl.style.fontSize = "26px";
+            burgerEl.style.zIndex = "50";
             burgerEl.innerText = "🍔";
             burgerOverlay = new kakao.maps.CustomOverlay({
                 position: new kakao.maps.LatLng(source.lat, source.lng),
-                content: burgerEl
+                content: burgerEl,
+                xAnchor: 0.5,
+                yAnchor: 0.5
             });
             burgerOverlay.setMap(map);
         }
 
-        // 인터벌을 활용해 미세하게 프레임 분할 전송
         const frameInterval = setInterval(() => {
             currentProgress++;
             
-            // 실시간 비례 배분 위치좌표 계산
             const currentLat = source.lat + (target.lat - source.lat) * (currentProgress / totalFrames);
             const currentLng = source.lng + (target.lng - source.lng) * (currentProgress / totalFrames);
             const currentLatLng = new kakao.maps.LatLng(currentLat, currentLng);
@@ -539,30 +547,26 @@
                 burgerOverlay.setPosition(currentLatLng);
             }
 
-            // 도착 완료 시점 처리
             if (currentProgress >= totalFrames) {
                 clearInterval(frameInterval);
                 
-                // 생성했던 오브젝트 클리어
                 if (laserLine) laserLine.setMap(null);
                 if (burgerOverlay) burgerOverlay.setMap(null);
 
-                // 최종 타격 데미지 연산 판정 및 점프 체크 회피 시스템
                 applyDamageHit(target);
             }
-        }, 20); // 0.02초 간격으로 무대 이동 연출 진행
+        }, 20); 
     }
 
     function applyDamageHit(target) {
         if (target.hp <= 0) return;
 
-        // 점프 기동 중 피격 시 완벽한 데미지 무효화(요구사항 반영)
+        // 고속 점프 도중 타이밍 적중 시 완벽 회피
         if (target.isJumping) {
             showDodgeEffect(target.id);
             return; 
         }
 
-        // 데미지 1 삭감
         target.hp -= 1;
         const hpFill = document.getElementById(`hp-fill-${target.id}`);
         if (hpFill) {
@@ -576,7 +580,6 @@
         }
     }
 
-    // 회피 성공 텍스트 팝업 이펙트
     function showDodgeEffect(schoolId) {
         const node = document.getElementById(`school-node-${schoolId}`);
         if (node) {
@@ -584,7 +587,7 @@
             txt.className = 'dodge-text';
             txt.innerText = 'DODGE!';
             node.appendChild(txt);
-            setTimeout(() => txt.remove(), 400);
+            setTimeout(() => txt.remove(), 300);
         }
     }
 
