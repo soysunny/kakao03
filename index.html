@@ -96,7 +96,6 @@
             z-index: 20;
         }
 
-        /* 탱크 아이콘 버튼 */
         #tank-btn {
             width: 60px;
             height: 60px;
@@ -111,7 +110,6 @@
             transition: transform 0.2s;
         }
 
-        /* 현위치 복귀 버튼 */
         #current-loc-btn {
             width: 60px;
             height: 60px;
@@ -196,7 +194,6 @@
             display: none;
         }
 
-        /* 피격 회피(DODGE) 텍스트 스타일 */
         .dodge-text {
             position: absolute;
             top: -30px;
@@ -207,7 +204,6 @@
             animation: fadeUp 0.3s ease-out forwards;
         }
 
-        /* 햄버거 회피 성공 시 체력 회복 텍스트 스타일 */
         .heal-text {
             position: absolute;
             top: -30px;
@@ -218,7 +214,6 @@
             animation: fadeUp 0.5s ease-out forwards;
         }
 
-        /* 가상 햄버거집 마커 스타일 */
         .burger-marker-pin {
             background: #ff9800;
             color: white;
@@ -550,14 +545,9 @@
 
     function beginBattle() {
         warInterval = setInterval(() => {
-            // 1. 레이저 사격 연산 및 적 학교 자동 점프 AI 제어
+            // 1. 레이저 사격 연산
             schools.forEach(source => {
                 if (source.hp <= 0) return;
-
-                // 일반 상황 회피 기동 레이저 점프 (20% 확률)
-                if (!source.isPlayer && !source.isJumping && !source.onCooldown) {
-                    if (Math.random() < 0.20) triggerJump(source.id);
-                }
 
                 if (source.skipNextAttack) {
                     source.skipNextAttack = false; 
@@ -586,15 +576,6 @@
                 const livingSchools = schools.filter(s => s.hp > 0);
                 if (livingSchools.length > 0) {
                     const targetSchool = livingSchools[Math.floor(Math.random() * livingSchools.length)];
-                    
-                    // [AI 보완] 적 학교가 타겟이 되었을 때, 40% 확률로 🍔 폭격을 예상하고 날아오기 전에 선제 점프를 시도하도록 설계
-                    if (!targetSchool.isPlayer && !targetSchool.isJumping && !targetSchool.onCooldown) {
-                        if (Math.random() < 0.40) {
-                            // 투사체가 날아가는 도중에 공중에 떠 있도록 약간의 시차 텀을 부여하여 점프 트리거
-                            setTimeout(() => triggerJump(targetSchool.id), 100);
-                        }
-                    }
-
                     animateProjectile(randomShop, targetSchool, 'hamburger');
                 }
             }
@@ -609,6 +590,19 @@
         
         let laserLine = null;
         let burgerOverlay = null;
+
+        // [변경] 투사체가 발사되는 순간, 타겟이 컴퓨터(AI) 학교라면 '실시간 날아오는 도중'에 회피 판단을 내리도록 수정
+        if (!target.isPlayer && !target.isJumping && !target.onCooldown) {
+            // 35% 확률로 회피 기동 발동
+            if (Math.random() < 0.35) {
+                // 레이저는 24프레임(약 480ms), 햄버거는 14프레임(약 280ms) 동안 날아감
+                // 정확히 피격되기 직전 타이밍(중간 지점 이후)에 점프를 뛰도록 타임아웃 딜레이 세부 설계
+                const delay = (type === 'laser') ? 220 : 100; 
+                setTimeout(() => {
+                    triggerJump(target.id);
+                }, delay);
+            }
+        }
 
         if (type === 'laser') {
             laserLine = new kakao.maps.Polyline({
@@ -672,11 +666,9 @@
         updateHpBar(target);
     }
 
-    // 햄버거 피격/회피 판정 (이제 모든 적 AI 학교에도 일괄 동등 적용!)
     function applyBurgerHit(target) {
         if (target.hp <= 0) return;
 
-        // 플레이어든 적 컴퓨터든 점프 상태에서 🍔를 맞이하면 똑같이 HP +2 회복!
         if (target.isJumping) {
             target.hp += 2;
             if (target.hp > target.maxHp) target.hp = target.maxHp; 
@@ -686,7 +678,6 @@
             return;
         }
 
-        // 공중 회피 실패 시 대미지 1 처리
         target.hp -= 1;
         updateHpBar(target);
     }
