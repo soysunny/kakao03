@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>School War Map Service - Branch Expansion</title>
+    <title>School War Map Service - Branch Aggressive</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body, html { width: 100%; height: 100%; font-family: 'Malgun Gothic', sans-serif; overflow: hidden; }
@@ -29,36 +29,28 @@
         .school-overlay-box { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; transition: transform 0.05s ease-out; }
         .school-overlay-box.jumping { transform: translateY(-60px) scale(1.15); }
         
-        /* HP / 게이지바 구조 */
         .hp-bar-container { width: 70px; height: 10px; background: #eee; border: 1px solid #333; border-radius: 3px; overflow: hidden; position: relative; margin-bottom: 2px; }
         .hp-bar-fill { height: 100%; background: #ff4444; transition: width 0.1s; width: 100%; }
-        
-        /* 분교 흡수 게이지 (그로기 전용) */
         .groggy-bar-fill { height: 100%; background: #757575; transition: width 0.1s; width: 100%; }
 
         .school-label { background: #333; color: white; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-bottom: 4px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); white-space: nowrap; border: 2px solid transparent; }
         
-        /* 진영별 스킨 테두리 */
         .player-school .school-label { background: #3385ff; border: 2px solid #fff; }
         .target-school .school-label { border: 2px solid #ffeb3b; box-shadow: 0 0 10px #ffeb3b; }
-        
-        /* 분교 전용 클래스 */
         .branch-school .school-label { background: #673ab7; border: 2px solid #e040fb; opacity: 0.85; }
 
         .cooldown-indicator { font-size: 9px; color: #d32f2f; background: rgba(255, 255, 255, 0.9); padding: 1px 3px; border-radius: 3px; margin-top: 2px; font-weight: bold; display: none; }
         
-        /* 애니메이션 텍스트 */
         .dodge-text { position: absolute; top: -30px; color: #00ff2b; font-weight: bold; font-size: 18px; text-shadow: 2px 2px 2px #000; animation: fadeUp 0.3s ease-out forwards; }
         .heal-text { position: absolute; top: -30px; color: #ffeb3b; font-weight: bold; font-size: 18px; text-shadow: 2px 2px 2px #000; animation: fadeUp 0.5s ease-out forwards; }
         
-        /* 햄버거 마커 */
         .burger-marker-pin { background: #ff9800; color: white; font-size: 11px; font-weight: bold; padding: 4px 8px; border-radius: 20px; border: 2px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.4); white-space: nowrap; display: flex; align-items: center; position: relative; }
         .burger-marker-pin::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 6px 6px 0; border-style: solid; border-color: #ff9800 transparent; display: block; width: 0; }
 
         #countdown-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; color: white; font-size: 120px; font-weight: bold; z-index: 100; }
         .status-mark { color: #555; font-weight: bold; font-size: 11px; background: #e0e0e0; padding: 1px 4px; border-radius: 3px; margin-top: 2px; text-align: center; }
 
-        /* [신규] 대형 승리 축하 스크린 오버레이 */
+        /* 대형 승리 축하 스크린 오버레이 */
         #victory-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.85); display: none;
@@ -108,7 +100,6 @@
     let userCurrentMarker = null; 
     let searchMarkers = [];        
 
-    // 학교 원본 데이터 배열 구조 전면 리팩토링
     const schools = [
         { id: 0, name: "고양국제고", originName: "고양국제고", lat: 37.671912, lng: 126.812324, hp: 30, maxHp: 30, isPlayer: true, isJumping: false, onCooldown: false, skipNextAttack: false, status: "ALIVE", lastAttackerId: null, isBranch: false, parentId: null },
         { id: 1, name: "양일초", originName: "양일초", lat: 37.671040, lng: 126.815520, hp: 30, maxHp: 30, isPlayer: false, isJumping: false, onCooldown: false, skipNextAttack: false, status: "ALIVE", lastAttackerId: null, isBranch: false, parentId: null },
@@ -189,12 +180,11 @@
 
     function triggerJump(schoolId) {
         const school = schools[schoolId];
-        // [조건변경] 분교(isBranch)나 그로기(GROGGY) 상태인 학교는 점프(피하기) 불가능
         if (!school || school.status !== "ALIVE" || school.isBranch || school.isJumping || school.onCooldown) return;
 
         school.isJumping = true;
         school.onCooldown = true;
-        school.skipNextAttack = true; 
+        school.skipNextAttack = true; // 다음 공격 1회 쉬기 플래그 ON
 
         const overlayDom = document.getElementById(`school-node-${schoolId}`);
         if (overlayDom) overlayDom.classList.add('jumping'); 
@@ -261,7 +251,6 @@
     }
 
     function createSchoolUI() {
-        // 모든 인스턴스 정보 초기 청소
         schoolOverlays.forEach(o => o.setMap(null));
         schoolOverlays = [];
 
@@ -291,7 +280,6 @@
             
             content.onclick = (e) => {
                 e.stopPropagation();
-                // 살아있거나 그로기인 적 학교 타겟 지정 가능 (분교는 직접 타겟 불가 - 본교 타겟 연동)
                 if (schools[0].status === "ALIVE" && school.id !== 0 && school.status !== "DEAD" && !school.isBranch) {
                     if (userTargetId !== null) {
                         const prevTargetDom = document.getElementById(`school-node-${userTargetId}`);
@@ -309,12 +297,17 @@
     }
 
     function beginBattle() {
+        // AI 본교 사격 빈도를 0.8초(800ms)로 가속화하여 전투적 교전 유도
         warInterval = setInterval(() => {
-            // 1. 레이저 사격 및 AI 연산 루프
             schools.forEach(source => {
                 if (source.status === "DEAD") return; 
 
-                // 분교 메커니즘: 분교는 독자 타겟을 잡지 않고 본교의 타겟을 똑같이 어시스트 사격함
+                // [버거 수정] 공격자가 점프 후 딜레이 상태인지 체크 (분교는 본교의 명령에 따르므로 패스)
+                if (!source.isBranch && source.skipNextAttack) {
+                    source.skipNextAttack = false; // 플래그를 소모하고 사격 건너뜀
+                    return; 
+                }
+
                 let target = null;
                 if (source.isBranch) {
                     const parentSchool = schools.find(s => s.id === source.parentId);
@@ -322,7 +315,6 @@
                         target = getTargetForSchool(parentSchool);
                     }
                 } else {
-                    // 본교 기동 사격
                     if (source.status === "ALIVE") {
                         target = getTargetForSchool(source);
                     }
@@ -331,15 +323,13 @@
                 if (target) animateProjectile(source, target, 'laser', source.id);
             });
 
-            // 2. 가상 생성된 햄버거집 폭격 연산 (40% 확률)
+            // 햄버거집 폭격 연산
             if (burgerShops.length > 0 && Math.random() < 0.40) {
                 const randomShop = burgerShops[Math.floor(Math.random() * burgerShops.length)];
-                // 햄버거는 살아있는 본교 및 배정된 분교 모두에게 투하될 수 있음 (단, 그로기는 패스)
                 const attackableSchools = schools.filter(s => s.status === "ALIVE");
                 if (attackableSchools.length > 0) {
                     const targetSchool = attackableSchools[Math.floor(Math.random() * attackableSchools.length)];
                     
-                    // 적 본교 학교가 🍔 표적이 되었을 때 실시간 반응형 선제점프
                     if (!targetSchool.isPlayer && !targetSchool.isBranch && !targetSchool.isJumping && !targetSchool.onCooldown) {
                         if (Math.random() < 0.40) {
                             setTimeout(() => triggerJump(targetSchool.id), 100);
@@ -350,20 +340,24 @@
             }
 
             checkGameOver();
-        }, 1000);
+        }, 800); // 속도 단축 패치
     }
 
-    // 학교별 현재 조준 타겟 반환 헬퍼 함수
     function getTargetForSchool(school) {
         if (school.isPlayer) {
             if (userTargetId !== null) {
                 const t = schools.find(s => s.id === userTargetId);
-                // 그로기 상태인 적도 흡수하기 위해 공격 대상으로 유지
                 if (t && t.status !== "DEAD") return t;
             }
         } else {
-            // AI 컴퓨터는 살아있거나 그로기 상태인 다른 진영을 무작위 점사 (자신의 분교는 쏘지 않음)
-            const enemies = schools.filter(s => s.id !== school.id && s.status !== "DEAD" && s.parentId !== school.id && !school.isBranch);
+            // [AI 공격성 강화] 맵 상에 회색 바를 가진 'GROGGY(그로기)' 상태의 학교가 있다면 최우선 점사하여 분교 획득 유도!
+            const groggyEnemies = schools.filter(s => s.id !== school.id && s.status === "GROGGY" && s.parentId !== school.id);
+            if (groggyEnemies.length > 0) {
+                return groggyEnemies[Math.floor(Math.random() * groggyEnemies.length)];
+            }
+
+            // 그로기 대상이 없다면 정상적인 생존 학교 무작위 사격
+            const enemies = schools.filter(s => s.id !== school.id && s.status === "ALIVE" && s.parentId !== school.id && !s.isBranch);
             if (enemies.length > 0) {
                 return enemies[Math.floor(Math.random() * enemies.length)];
             }
@@ -377,7 +371,6 @@
         let laserLine = null;
         let burgerOverlay = null;
 
-        // 투사체 발사 순간, 표적이 컴퓨터(AI) 본교 학교라면 회피 연산 작동 (분교/그로기는 회피 불가)
         if (target.status === "ALIVE" && !target.isPlayer && !target.isBranch && !target.isJumping && !target.onCooldown) {
             if (Math.random() < 0.35) {
                 const delay = (type === 'laser') ? 220 : 100; 
@@ -386,10 +379,11 @@
         }
 
         if (type === 'laser') {
-            const isSourcePlayer = (schools.find(s => s.id === attackerId).isPlayer || schools.find(s => s.id === attackerId).parentId === 0);
+            const sourceInfo = schools.find(s => s.id === attackerId);
+            const isSourcePlayer = (sourceInfo.isPlayer || sourceInfo.parentId === 0);
             laserLine = new kakao.maps.Polyline({
                 path: [new kakao.maps.LatLng(source.lat, source.lng), new kakao.maps.LatLng(source.lat, source.lng)],
-                strokeWeight: source.isBranch ? 2 : 4, // 분교 레이저는 조금 얇게 표현
+                strokeWeight: source.isBranch ? 2 : 4, 
                 strokeColor: isSourcePlayer ? '#00c3ff' : '#ff3333',
                 strokeOpacity: 0.9,
                 strokeStyle: 'solid'
@@ -419,7 +413,6 @@
                 if (laserLine) laserLine.setMap(null);
                 if (burgerOverlay) burgerOverlay.setMap(null);
 
-                // 최종 타격 판정 전송 (누가 공격했는지 attackerId 수집)
                 if (type === 'laser') {
                     applyDamageHit(target, attackerId);
                 } else {
@@ -432,34 +425,28 @@
     function applyDamageHit(target, attackerId) {
         if (target.status === "DEAD") return;
 
-        // 1. 회피 성공 판정 (본교 생존 상태일 때만 가능)
         if (target.status === "ALIVE" && target.isJumping) {
             showEffectText(target.id, 'DODGE!', 'dodge-text');
             return; 
         }
 
-        // 공격자 추적 기록 저장
         if (attackerId !== null && attackerId !== undefined) {
             target.lastAttackerId = attackerId;
         }
 
-        // 2. 분교 상태일 때 대미지 핸들링
         if (target.isBranch) {
             target.hp -= 1;
             updateHpBar(target);
             return;
         }
 
-        // 3. 일반 본교 생존 상태일 때 대미지 핸들링
         if (target.status === "ALIVE") {
             target.hp -= 1;
             if (target.hp <= 0) {
-                // HP가 처음으로 0이 되면 그로기 상태(그레이바 타임) 진입
                 target.status = "GROGGY";
-                target.hp = 15; // 분교 흡수 게이지 총량 15 격리 배정
+                target.hp = 15; 
                 target.maxHp = 15;
                 
-                // UI를 게이지바 형태로 리프레시 체인지
                 const frame = document.getElementById(`bar-frame-${target.id}`);
                 if (frame) frame.innerHTML = `<div id="hp-fill-${target.id}" class="groggy-bar-fill"></div>`;
                 const statusLabel = document.getElementById(`status-${target.id}`);
@@ -467,11 +454,9 @@
             }
             updateHpBar(target);
         } 
-        // 4. 그로기 상태에서 추가 난타 당할 때 핸들링
         else if (target.status === "GROGGY") {
             target.hp -= 1;
             if (target.hp <= 0) {
-                // 흡수 게이지 소멸 -> 분교화 시스템 작동!!
                 convertToBranch(target);
             } else {
                 updateHpBar(target);
@@ -479,24 +464,20 @@
         }
     }
 
-    // [신규 기능] 패배한 학교를 마지막 타격자의 분교로 예속시키는 핵심 로직
     function convertToBranch(target) {
         const attacker = schools.find(s => s.id === target.lastAttackerId);
-        // 만약 마지막 공격자 조회가 불가능하면 기본 플레이어 혹은 무작위 생존 학교 예속
         const master = (attacker) ? (attacker.isBranch ? schools.find(s => s.id === attacker.parentId) : attacker) : schools[0];
 
-        target.status = "ALIVE"; // 분교로 재활성화
+        target.status = "ALIVE"; 
         target.isBranch = true;
         target.parentId = master.id;
-        target.hp = 15;       // 본교 체력의 절반인 15로 강제 설정
+        target.hp = 15;       
         target.maxHp = 15;
-        target.name = `${master.originName} 분교`; // 이름 개편
+        target.name = `${master.originName} 분교`; 
 
-        // 돔 구조 인터페이스 스킨 교체
         const node = document.getElementById(`school-node-${target.id}`);
         if (node) {
             node.className = "school-overlay-box branch-school";
-            // 만약 플레이어의 분교가 되었다면 타겟 지정 마크 클리어용 레이아웃 조정
             if (userTargetId === target.id) {
                 node.classList.remove('target-school');
                 userTargetId = null;
@@ -515,9 +496,8 @@
     }
 
     function applyBurgerHit(target) {
-        if (target.status !== "ALIVE") return; // 그로기 상태는 햄버거 노터치
+        if (target.status !== "ALIVE") return; 
 
-        // 분교는 햄버거를 피할 수 없음 (무조건 대미지 1)
         if (target.isJumping && !target.isBranch) {
             target.hp += 2;
             if (target.hp > target.maxHp) target.hp = target.maxHp; 
@@ -541,11 +521,10 @@
             if (userTargetId === target.id) userTargetId = null;
             
             if (target.isBranch) {
-                // 분교가 파괴되었을 때는 화면에서 영구히 "제거(Eliminated)"
                 target.status = "DEAD";
                 const overlayIndex = schools.findIndex(s => s.id === target.id);
                 if (schoolOverlays[overlayIndex]) {
-                    schoolOverlays[overlayIndex].setMap(null); // 지도 오버레이 완전 영구 삭제
+                    schoolOverlays[overlayIndex].setMap(null); 
                 }
             }
         }
@@ -561,20 +540,18 @@
         }
     }
 
-    // 승리 조건 체크 로직 (분교를 제외하고 오직 '살아있는 본교'가 1개 진영만 남았을 때)
     function checkGameOver() {
         const aliveMainSchools = schools.filter(s => s.status === "ALIVE" && !s.isBranch);
         const groggySchools = schools.filter(s => s.status === "GROGGY");
 
-        // 살아있는 본교가 딱 1곳이고, 더이상 흡수할 그로기 상태 학교도 없을 때 단독 승리 선언
         if (aliveMainSchools.length === 1 && groggySchools.length === 0) {
             const winner = aliveMainSchools[0];
-            clearInterval(warInterval);
+            clearInterval(warInterval); // 루프 중단
             showVictoryScreen(winner);
         }
     }
 
-    // [신규 기능] 대형 승리 연출 스크린 표시 및 해당 본교 카메라 무빙 트래킹
+    // [연출 타이밍 조정 패치] 대형 승리 연출 -> 카메라 이동 -> 완전 종료 순서 구축
     function showVictoryScreen(winnerSchool) {
         const screen = document.getElementById('victory-screen');
         const subText = document.getElementById('victory-sub');
@@ -582,20 +559,20 @@
         subText.innerText = `🎉 단독 최강의 본교: ${winnerSchool.originName} 🎉`;
         screen.style.display = 'flex';
 
-        // 3.5초간 화려한 축하 연출 노출 후 카메라 이동
+        // 1. 3.5초간 대형 축하 오버레이 지속
         setTimeout(() => {
-            screen.style.display = 'none';
+            screen.style.display = 'none'; // 오버레이 스크린 닫기
             
-            // 승리한 학교의 위경도 좌표 인출 후 부드러운 카메라 무빙 센터 포커싱
+            // 2. 전쟁 상황판이 그대로 살아있는 상태에서 승리 학교 위치로 카메라 부드럽게 무빙!
             const winnerLatLng = new kakao.maps.LatLng(winnerSchool.lat, winnerSchool.lng);
-            map.setLevel(3);       // 상세 확대를 위해 맵 레벨 좁히기
-            map.panTo(winnerLatLng); // 부드러운 좌표 이동 
-            
-            // 2초 후 완전 초기 상태로 게임 리셋 포맷
+            map.setLevel(3);       
+            map.panTo(winnerLatLng); 
+
+            // 3. 카메라 이동 후, 사용자가 영광의 현장을 충분히 확인하도록 2.5초 대기
             setTimeout(() => {
-                alert(`전쟁 모드가 리셋됩니다.`);
-                resetWarMode();
-            }, 2000);
+                alert(`[전쟁 종료] ${winnerSchool.originName}의 단독 승리로 학교 전쟁 모드가 완전 종료됩니다!`);
+                resetWarMode(); // 여기서 모든 맵 오버레이가 완전 초기화 및 복귀됨
+            }, 2500);
 
         }, 3500);
     }
